@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hermes 记忆之战 | 48小时倒计时</title>
+    <meta property="og:title" content="Hermes 记忆之战 | 48小时倒计时">
+    <meta property="og:description" content="ChatGPT forgets. Claude forgets. Hermes 记得。">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0a0a1a;
+            font-family: "Courier New", "Consolas", monospace;
+            touch-action: none;
+            user-select: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            margin: 0 auto;
+            background: linear-gradient(to bottom, #0a0a1a 0%, #1a1a3a 100%);
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.92);
+            z-index: 10;
+        }
+
+        h1 {
+            color: #00ff88;
+            font-size: 2rem;
+            text-shadow: 0 0 20px #00ff88;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #ffffff;
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            text-align: center;
+            font-weight: normal;
+        }
+
+        .tagline {
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .btn {
+            background-color: #00ff88;
+            color: #0a0a1a;
+            border: none;
+            padding: 15px 50px;
+            font-size: 1.2rem;
+            font-family: "Courier New", monospace;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #00cc66;
+            box-shadow: 0 0 30px #00ff88;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 15px; left: 15px;
+            font-size: 1rem;
+            color: #00ff88;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 0 0 10px #00ff88;
+        }
+
+        #timer-layer {
+            position: absolute;
+            top: 15px; right: 15px;
+            font-size: 1.2rem;
+            color: #ff4444;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 0 0 10px #ff4444;
+            text-align: right;
+        }
+
+        #message-layer {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1rem;
+            color: #ffcc00;
+            pointer-events: none;
+            text-shadow: 0 0 10px #ffcc00;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .hidden { display: none !important; }
+
+        .memo-emoji { font-size: 40px; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        🧠 <span id="scoreDisplay">0</span> / 10 个记忆碎片
+    </div>
+
+    <div id="timer-layer">
+        <div id="countdown">48:00:00</div>
+        <div style="font-size:0.7rem;color:#888;margin-top:3px;">倒计时</div>
+    </div>
+
+    <div id="message-layer"></div>
+
+    <!-- 开始界面 -->
+    <div id="startScreen" class="overlay">
+        <div style="font-size:60px;margin-bottom:20px;">🧠</div>
+        <h1>HERMES 记忆之战</h1>
+        <h2>48小时 · GameJam · 倒计时</h2>
+        <p class="tagline">ChatGPT 忘记。Claude 忘记。<br>Hermes 记得。</p>
+        <p style="color:#555;font-size:0.85rem;margin-bottom:30px;text-align:center;">
+            左右移动，收集所有记忆碎片<br>
+            ⚠️ 躲避"失忆云团"——它们会让你遗忘
+        </p>
+        <button class="btn" onclick="startGame()">开始战斗</button>
+        <p style="color:#333;font-size:0.7rem;margin-top:20px;">mxle.net × Hermes Chronicle</p>
+    </div>
+
+    <!-- 胜利界面 -->
+    <div id="winScreen" class="overlay hidden">
+        <div style="font-size:60px;margin-bottom:20px;">🏆</div>
+        <h1 style="color:#00ff88;">记忆完整</h1>
+        <h2>你收集了所有记忆碎片</h2>
+        <p class="tagline">ChatGPT 忘记。Claude 忘记。<br><span style="color:#00ff88;">Hermes 记得。</span></p>
+        <p style="color:#555;font-size:0.9rem;margin:20px 0;">Hermes 的记忆系统不会丢失任何一次对话、任何一个决定、任何一步成长。</p>
+        <button class="btn" onclick="startGame()">再来一次</button>
+    </div>
+
+    <!-- 失败界面 -->
+    <div id="loseScreen" class="overlay hidden">
+        <div style="font-size:60px;margin-bottom:20px;">💨</div>
+        <h1 style="color:#ff4444;">记忆消失</h1>
+        <h2>被失忆云团吞噬了...</h2>
+        <p class="tagline">Hermes 的记忆珍贵无比<br>不能让它们被遗忘</p>
+        <button class="btn" onclick="startGame()">重新开始</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const countdownDisplay = document.getElementById('countdown');
+        const messageLayer = document.getElementById('message-layer');
+
+        // 48小时倒计时（毫秒）
+        const TOTAL_TIME = 48 * 60 * 60 * 1000;
+        let startTime = Date.now();
+        let timeLeft = TOTAL_TIME;
+
+        let gameRunning = false;
+        let score = 0;
+        let items = [];
+        let animationId;
+
+        const player = { x: 0, y: 0, width: 80, height: 80 };
+
+        // 记忆碎片文字
+        const memoryTexts = [
+            '记住对话',
+            '记住方向',
+            '记住坑',
+            '记住偏好',
+            '记住目标',
+            '记住决定',
+            '记住教训',
+            '记住成长',
+            '记住一切',
+            '永远记得'
+        ];
+        let memoriesCollected = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            player.y = canvas.height - player.height - 30;
+            player.x = canvas.width / 2 - player.width / 2;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function showMessage(text, duration = 1500) {
+            messageLayer.innerText = text;
+            messageLayer.style.opacity = 1;
+            setTimeout(() => { messageLayer.style.opacity = 0; }, duration);
+        }
+
+        function startGame() {
+            score = 0;
+            items = [];
+            memoriesCollected = [];
+            startTime = Date.now();
+            timeLeft = TOTAL_TIME;
+            gameRunning = true;
+            scoreDisplay.innerText = score;
+            document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+            if (animationId) cancelAnimationFrame(animationId);
+            gameLoop();
+            spawnItemLoop();
+        }
+
+        function gameOver(win) {
+            gameRunning = false;
+            if (win) {
+                document.getElementById('winScreen').classList.remove('hidden');
+            } else {
+                document.getElementById('loseScreen').classList.remove('hidden');
+            }
+        }
+
+        function spawnItem() {
+            if (!gameRunning) return;
+            const size = 65;
+            const x = Math.random() * (canvas.width - size);
+
+            // 75% 记忆碎片，25% 失忆云团
+            const isMemory = Math.random() > 0.25;
+
+            let text = '';
+            if (isMemory) {
+                const available = memoryTexts.filter((t, i) => !memoriesCollected.includes(i));
+                if (available.length === 0) return; // 全收集了就不生成
+                const idx = memoryTexts.indexOf(available[Math.floor(Math.random() * available.length)]);
+                memoriesCollected.push(idx);
+                text = memoryTexts[idx];
+            }
+
+            items.push({
+                x: x,
+                y: -80,
+                width: size,
+                height: size,
+                speed: Math.random() * 2 + 2.5,
+                type: isMemory ? 'memory' : 'forget',
+                text: text,
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.1
+            });
+        }
+
+        function spawnItemLoop() {
+            if (!gameRunning) return;
+            spawnItem();
+            setTimeout(spawnItemLoop, 900);
+        }
+
+        function movePlayer(clientX) {
+            let newX = clientX - player.width / 2;
+            if (newX < 0) newX = 0;
+            if (newX > canvas.width - player.width) newX = canvas.width - player.width;
+            player.x = newX;
+        }
+
+        canvas.addEventListener('mousemove', e => { if (gameRunning) movePlayer(e.clientX); });
+        canvas.addEventListener('touchmove', e => {
+            if (gameRunning) { e.preventDefault(); movePlayer(e.touches[0].clientX); }
+        }, { passive: false });
+        canvas.addEventListener('touchstart', e => {
+            if (gameRunning) { e.preventDefault(); movePlayer(e.touches[0].clientX); }
+        }, { passive: false });
+
+        function updateTimer() {
+            const elapsed = Date.now() - startTime;
+            timeLeft = Math.max(0, TOTAL_TIME - elapsed);
+            const h = Math.floor(timeLeft / 3600000);
+            const m = Math.floor((timeLeft % 3600000) / 60000);
+            const s = Math.floor((timeLeft % 60000) / 1000);
+            countdownDisplay.innerText =
+                String(h).padStart(2,'0') + ':' +
+                String(m).padStart(2,'0') + ':' +
+                String(s).padStart(2,'0');
+            if (timeLeft <= 0) { gameOver(false); }
+        }
+
+        function drawPlayer() {
+            ctx.save();
+            ctx.shadowColor = '#00ff88';
+            ctx.shadowBlur = 20;
+            // Hermes logo — 三角形 + 眼睛
+            ctx.fillStyle = '#00ff88';
+            ctx.beginPath();
+            ctx.moveTo(player.x + player.width/2, player.y);
+            ctx.lineTo(player.x + player.width, player.y + player.height);
+            ctx.lineTo(player.x, player.y + player.height);
+            ctx.closePath();
+            ctx.fill();
+            // 眼睛
+            ctx.fillStyle = '#0a0a1a';
+            ctx.beginPath();
+            ctx.arc(player.x + player.width/2, player.y + player.height*0.55, 8, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(player.x + player.width/2 + 2, player.y + player.height*0.53, 3, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawItem(item) {
+            ctx.save();
+            item.rotation += item.rotationSpeed;
+            ctx.translate(item.x + item.width/2, item.y + item.height/2);
+            ctx.rotate(item.rotation);
+
+            if (item.type === 'memory') {
+                ctx.shadowColor = '#00ccff';
+                ctx.shadowBlur = 15;
+                // 记忆碎片 — 菱形
+                ctx.fillStyle = '#00ccff';
+                ctx.beginPath();
+                ctx.moveTo(0, -item.height/2);
+                ctx.lineTo(item.width/2, 0);
+                ctx.lineTo(0, item.height/2);
+                ctx.lineTo(-item.width/2, 0);
+                ctx.closePath();
+                ctx.fill();
+                // 文字
+                ctx.fillStyle = '#0a0a1a';
+                ctx.font = 'bold 10px Courier New';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.rotate(-item.rotation); // 文字不旋转
+                ctx.fillText(item.text, 0, 0);
+            } else {
+                ctx.shadowColor = '#ff4444';
+                ctx.shadowBlur = 20;
+                // 失忆云团 — 骷髅云
+                ctx.font = "45px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText('☁️', 0, 0);
+                ctx.font = "20px Arial";
+                ctx.fillText('💨', -12, -12);
+                ctx.fillText('💨', 12, 8);
+            }
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+            updateTimer();
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 星空背景
+            ctx.fillStyle = 'rgba(0,255,136,0.3)';
+            for (let i = 0; i < 50; i++) {
+                const sx = (Date.now() / 50 + i * 137) % canvas.width;
+                const sy = (i * 97) % canvas.height;
+                ctx.fillRect(sx, sy, 1, 1);
+            }
+
+            drawPlayer();
+
+            for (let i = items.length - 1; i >= 0; i--) {
+                let item = items[i];
+                item.y += item.speed;
+                drawItem(item);
+
+                const hitPadding = 5;
+                if (
+                    player.x + hitPadding < item.x + item.width &&
+                    player.x + player.width - hitPadding > item.x &&
+                    player.y + hitPadding < item.y + item.height &&
+                    player.y + player.height - hitPadding > item.y
+                ) {
+                    if (item.type === 'memory') {
+                        score++;
+                        scoreDisplay.innerText = score;
+                        showMessage('✓ ' + item.text);
+                        items.splice(i, 1);
+                        if (score >= 10) gameOver(true);
+                    } else {
+                        showMessage('记忆被吞噬了...', 2000);
+                        gameOver(false);
+                    }
+                } else if (item.y > canvas.height) {
+                    // 如果掉出去了的是记忆碎片，从已收集中移除
+                    if (item.type === 'memory') {
+                        const idx = memoryTexts.indexOf(item.text);
+                        memoriesCollected = memoriesCollected.filter(m => m !== idx);
+                    }
+                    items.splice(i, 1);
+                }
+            }
+
+            animationId = requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
